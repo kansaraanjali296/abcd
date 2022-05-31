@@ -1,0 +1,105 @@
+import os
+import sqlite3
+import warnings
+import requests
+from datetime import datetime
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+import logging
+import pyodbc
+import re
+from zipfile import ZipFile
+from webdriver_manager.chrome import ChromeDriverManager
+
+warnings.simplefilter("ignore")
+driver = webdriver.Chrome(ChromeDriverManager().install())
+
+
+def download_pdf(links):
+
+    # ***************** one by one File Download of any extension *****************
+    all_links = links.split(',')
+    if len(all_links) > 1:
+        fullname = os.path.join(files_dir, datetime.now().strftime(f"%d%m%Y_%H%M%S%f") + '.zip')
+        zip_obj = ZipFile(fullname, 'w')
+
+        for pdfLink in all_links:
+            filename = datetime.now().strftime(f"%d%m%Y_%H%M%S%f") + "." + pdfLink.rsplit('.', 1)[-1]
+            response = requests.get(pdfLink)
+
+            pdf = open(filename, 'wb')
+            pdf.write(response.content)
+            pdf.close()
+
+            zip_obj.write(filename)
+            os.remove(filename)
+            logging.info("Zip File Downloaded")
+
+    else:
+        response = requests.get(links)
+        fullname = os.path.join(files_dir, datetime.now().strftime(f"%d%m%Y_%H%M%S%f") + "." + links.rsplit('.', 1)[-1])
+
+        pdf = open(fullname, 'wb')
+        pdf.write(response.content)
+        pdf.close()
+        logging.info("File Downloaded")
+
+    return fullname
+
+
+try:
+
+    url = 'http://bspcb.bihar.gov.in/tenders-notice.html'
+    driver.get(url)
+
+
+    files_dir = os.path.expanduser('~') + "\\Documents\\" + "PythonFile\\" + url.split('://')[1].split("/")[0] + "_tender_py\\" + "File"
+    if os.path.exists(files_dir):
+        pass
+    else:
+        os.makedirs(files_dir)
+
+    tr_all_data = driver.find_elements(By.XPATH, value='//tbody//tr//*[@class="tblbg1"]')
+    Page_Data = []
+    print(Page_Data)
+
+    for tr_data in tr_all_data:
+
+        if not 'Corrigendum' in tr_data.text:
+
+            # Content = tr_data.get_attribute('innerHTML')
+            # Content = RemoveExtraSpace(Content)
+        
+            sr_no = tr_data.find_element(By.XPATH, value='./td[1]').text.strip()
+            print(sr_no)
+
+            Tender_Summery = tr_data.find_element(By.XPATH, value='./td[2]').text.split('\n\n')[0].strip()
+            print(Tender_Summery)
+
+            links = []
+            links_data = tr_data.find_elements(By.TAG_NAME, value='a')
+            for lnk in links_data:
+                if not 'Click To Visit E-tender' in lnk.text:
+                    lnk = lnk.get_attribute('href')
+                    links.append(lnk)
+            links = ', '.join(links)  
+
+            print(links) ### string data     # print(link_list)  ### list data show
+            
+            print("--------------------------------------")
+
+            fullname = download_pdf(links)
+            Documents_2 = fullname
+
+            Row_data = [Tender_Summery, Documents_2]
+            Page_Data.append(Row_data)
+
+
+
+    print("*************************************************************************************************************")
+    driver.close()
+    
+    print("Completed")
+
+except Exception as e:
+    print(e)
